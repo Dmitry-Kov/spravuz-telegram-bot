@@ -5,8 +5,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 import os
 from datetime import datetime
 import json
-import asyncio
-from typing import Dict, Any
+from typing import Dict, Any, Optional, List
 
 # Загружаем переменные окружения из .env файла
 load_dotenv()
@@ -24,7 +23,7 @@ logger = logging.getLogger(__name__)
  FREE_MESSAGE) = range(10)
 
 # Тексты на разных языках
-TEXTS = {
+TEXTS: Dict[str, Dict[str, str]] = {
     'ru': {
         'welcome': 'Добро пожаловать! Выберите язык:',
         'choose_language': 'Выберите язык:',
@@ -101,32 +100,34 @@ TEXTS = {
 
 class UserData:
     """Класс для хранения данных пользователя"""
-    def __init__(self):
-        self.users_file = 'users_data.json'
-        self.requests_file = 'requests_data.json'
+    def __init__(self) -> None:
+        self.users_file: str = 'users_data.json'
+        self.requests_file: str = 'requests_data.json'
+        self.users: Dict[str, Any] = {}
+        self.requests: List[Dict[str, Any]] = []
         self.load_data()
     
-    def load_data(self):
+    def load_data(self) -> None:
         """Загрузка данных из файлов"""
         try:
             with open(self.users_file, 'r', encoding='utf-8') as f:
                 self.users = json.load(f)
-        except:
+        except (FileNotFoundError, json.JSONDecodeError):
             self.users = {}
         
         try:
             with open(self.requests_file, 'r', encoding='utf-8') as f:
                 self.requests = json.load(f)
-        except:
+        except (FileNotFoundError, json.JSONDecodeError):
             self.requests = []
     
-    def save_user(self, user_id: str, data: Dict[str, Any]):
+    def save_user(self, user_id: str, data: Dict[str, Any]) -> None:
         """Сохранение данных пользователя"""
         self.users[user_id] = data
         with open(self.users_file, 'w', encoding='utf-8') as f:
             json.dump(self.users, f, ensure_ascii=False, indent=2)
     
-    def save_request(self, request_data: Dict[str, Any]):
+    def save_request(self, request_data: Dict[str, Any]) -> int:
         """Сохранение заявки"""
         request_data['id'] = len(self.requests) + 1
         request_data['timestamp'] = datetime.now().isoformat()
@@ -141,6 +142,9 @@ user_data_storage = UserData()
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Начало диалога - выбор языка"""
+    if not update.message:
+        return ConversationHandler.END
+        
     keyboard = [
         ['🇷🇺 Русский'],
         ['🇺🇿 O\'zbekcha'],
@@ -157,6 +161,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def language_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Обработка выбора языка"""
+    if not update.message or not update.message.text or not context.user_data:
+        return LANGUAGE
+        
     text = update.message.text
     
     if '🇷🇺' in text:
@@ -182,12 +189,15 @@ async def language_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 async def phone_number_received(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Обработка полученного номера телефона"""
+    if not update.message or not context.user_data:
+        return PHONE_NUMBER
+        
     if update.message.contact:
         context.user_data['phone'] = update.message.contact.phone_number
-        context.user_data['telegram_id'] = update.message.from_user.id
-        context.user_data['username'] = update.message.from_user.username
+        context.user_data['telegram_id'] = update.message.from_user.id if update.message.from_user else None
+        context.user_data['username'] = update.message.from_user.username if update.message.from_user else None
         
-        lang = context.user_data['language']
+        lang = context.user_data.get('language', 'ru')
         await update.message.reply_text(
             TEXTS[lang]['enter_name'],
             reply_markup=ReplyKeyboardRemove()
@@ -200,25 +210,31 @@ async def phone_number_received(update: Update, context: ContextTypes.DEFAULT_TY
 
 async def full_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Обработка полученного ФИО"""
+    if not update.message or not update.message.text or not context.user_data:
+        return FULL_NAME
+        
     context.user_data['full_name'] = update.message.text
-    lang = context.user_data['language']
+    lang = context.user_data.get('language', 'ru')
     
     await update.message.reply_text(TEXTS[lang]['enter_company'])
     return COMPANY_NAME
 
 async def company_name_received(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Обработка названия компании и показ главного меню"""
+    if not update.message or not update.message.text or not update.message.from_user or not context.user_data:
+        return COMPANY_NAME
+        
     context.user_data['company'] = update.message.text
     
     # Сохраняем данные пользователя
     user_data_storage.save_user(
         str(update.message.from_user.id),
         {
-            'phone': context.user_data['phone'],
-            'full_name': context.user_data['full_name'],
-            'company': context.user_data['company'],
+            'phone': context.user_data.get('phone'),
+            'full_name': context.user_data.get('full_name'),
+            'company': context.user_data.get('company'),
             'username': context.user_data.get('username'),
-            'language': context.user_data['language']
+            'language': context.user_data.get('language')
         }
     )
     
@@ -226,7 +242,10 @@ async def company_name_received(update: Update, context: ContextTypes.DEFAULT_TY
 
 async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Показ главного меню"""
-    lang = context.user_data['language']
+    if not update.message or not context.user_data:
+        return MAIN_MENU
+        
+    lang = context.user_data.get('language', 'ru')
     
     keyboard = [
         [TEXTS[lang]['add_company']],
@@ -246,8 +265,11 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 async def handle_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Обработка выбора в главном меню"""
+    if not update.message or not update.message.text or not context.user_data:
+        return MAIN_MENU
+        
     text = update.message.text
-    lang = context.user_data['language']
+    lang = context.user_data.get('language', 'ru')
     
     if text == TEXTS[lang]['add_company']:
         await update.message.reply_text(
@@ -296,7 +318,10 @@ async def handle_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 async def company_correction_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Обработка названия компании для исправления"""
-    lang = context.user_data['language']
+    if not update.message or not update.message.text or not context.user_data:
+        return COMPANY_CORRECTION_NAME
+        
+    lang = context.user_data.get('language', 'ru')
     
     if update.message.text == TEXTS[lang]['cancel']:
         return await show_main_menu(update, context)
@@ -307,7 +332,10 @@ async def company_correction_name(update: Update, context: ContextTypes.DEFAULT_
 
 async def company_correction_details(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Обработка деталей исправления"""
-    lang = context.user_data['language']
+    if not update.message or not update.message.text or not update.message.from_user or not context.user_data:
+        return COMPANY_CORRECTION_DETAILS
+        
+    lang = context.user_data.get('language', 'ru')
     
     if update.message.text == TEXTS[lang]['cancel']:
         return await show_main_menu(update, context)
@@ -317,7 +345,7 @@ async def company_correction_details(update: Update, context: ContextTypes.DEFAU
         'type': 'correction',
         'user_id': update.message.from_user.id,
         'user_data': user_data_storage.users.get(str(update.message.from_user.id), {}),
-        'company_info': context.user_data['correction_company'],
+        'company_info': context.user_data.get('correction_company'),
         'correction_details': update.message.text
     })
     
@@ -328,7 +356,10 @@ async def company_correction_details(update: Update, context: ContextTypes.DEFAU
 
 async def advertising_request(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Обработка запроса на рекламу"""
-    lang = context.user_data['language']
+    if not update.message or not update.message.text or not context.user_data:
+        return ADVERTISING_REQUEST
+        
+    lang = context.user_data.get('language', 'ru')
     
     if update.message.text == TEXTS[lang]['cancel']:
         return await show_main_menu(update, context)
@@ -339,7 +370,10 @@ async def advertising_request(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def advertising_contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Обработка контактов для рекламы"""
-    lang = context.user_data['language']
+    if not update.message or not update.message.text or not update.message.from_user or not context.user_data:
+        return ADVERTISING_CONTACT
+        
+    lang = context.user_data.get('language', 'ru')
     
     if update.message.text == TEXTS[lang]['cancel']:
         return await show_main_menu(update, context)
@@ -349,7 +383,7 @@ async def advertising_contact(update: Update, context: ContextTypes.DEFAULT_TYPE
         'type': 'advertising',
         'user_id': update.message.from_user.id,
         'user_data': user_data_storage.users.get(str(update.message.from_user.id), {}),
-        'ad_request': context.user_data['ad_request'],
+        'ad_request': context.user_data.get('ad_request'),
         'contact_info': update.message.text
     })
     
@@ -360,7 +394,10 @@ async def advertising_contact(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def free_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Обработка произвольного сообщения"""
-    lang = context.user_data['language']
+    if not update.message or not update.message.text or not update.message.from_user or not context.user_data:
+        return FREE_MESSAGE
+        
+    lang = context.user_data.get('language', 'ru')
     
     if update.message.text == TEXTS[lang]['cancel']:
         return await show_main_menu(update, context)
@@ -380,6 +417,9 @@ async def free_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Отмена операции"""
+    if not update.message:
+        return ConversationHandler.END
+        
     await update.message.reply_text(
         'Операция отменена.',
         reply_markup=ReplyKeyboardRemove()
@@ -389,7 +429,10 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 def main() -> None:
     """Запуск бота"""
     # Токен бота из переменной окружения
-    TOKEN = os.getenv('BOT_TOKEN', "8123135099:AAHfoGL-6DjvS5GKN-putq1kL1tHVowJckc")
+    TOKEN: Optional[str] = os.getenv('BOT_TOKEN')
+    if not TOKEN:
+        logger.error("BOT_TOKEN не найден в переменных окружения")
+        return
     
     # Создание приложения
     application = Application.builder().token(TOKEN).build()

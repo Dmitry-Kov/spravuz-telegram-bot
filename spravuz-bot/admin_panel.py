@@ -7,7 +7,7 @@ from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 import asyncio
 from telegram import Bot
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional, Union, Tuple
 
 # Загружаем переменные окружения из .env файла
 load_dotenv()
@@ -22,51 +22,54 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'
 
 # Telegram Bot - токен из переменной окружения
-BOT_TOKEN = os.getenv('BOT_TOKEN', "8123135099:AAHfoGL-6DjvS5GKN-putq1kL1tHVowJckc")
-bot = Bot(token=BOT_TOKEN)
+BOT_TOKEN: Optional[str] = os.getenv('BOT_TOKEN')
+if BOT_TOKEN:
+    bot = Bot(token=BOT_TOKEN)
+else:
+    bot = None
 
 # Система пользователей для админки - пароли из переменных окружения
-ADMIN_USERS = {
+ADMIN_USERS: Dict[str, str] = {
     'admin': generate_password_hash(os.getenv('ADMIN_PASSWORD', 'admin123')),
     'manager': generate_password_hash(os.getenv('MANAGER_PASSWORD', 'manager123'))
 }
 
 class User(UserMixin):
-    def __init__(self, username):
+    def __init__(self, username: str) -> None:
         self.id = username
 
 @login_manager.user_loader
-def load_user(user_id):
+def load_user(user_id: str) -> Optional[User]:
     if user_id in ADMIN_USERS:
         return User(user_id)
     return None
 
 # Пути к файлам данных
-USERS_FILE = 'users_data.json'
-REQUESTS_FILE = 'requests_data.json'
+USERS_FILE: str = 'users_data.json'
+REQUESTS_FILE: str = 'requests_data.json'
 
-def load_json_file(filename):
+def load_json_file(filename: str) -> Any:
     """Загрузка данных из JSON файла"""
     try:
         with open(filename, 'r', encoding='utf-8') as f:
             return json.load(f)
-    except:
+    except (FileNotFoundError, json.JSONDecodeError):
         return {} if filename == USERS_FILE else []
 
-def save_json_file(filename, data):
+def save_json_file(filename: str, data: Any) -> None:
     """Сохранение данных в JSON файл"""
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 @app.route('/')
 @login_required
-def index():
+def index() -> str:
     """Главная страница - панель управления"""
-    requests_data = load_json_file(REQUESTS_FILE)
-    users_data = load_json_file(USERS_FILE)
+    requests_data: List[Dict[str, Any]] = load_json_file(REQUESTS_FILE)
+    users_data: Dict[str, Any] = load_json_file(USERS_FILE)
     
     # Статистика
-    stats = {
+    stats: Dict[str, int] = {
         'total_requests': len(requests_data),
         'new_requests': len([r for r in requests_data if r.get('status') == 'new']),
         'in_progress': len([r for r in requests_data if r.get('status') == 'in_progress']),
@@ -75,7 +78,7 @@ def index():
     }
     
     # Фильтрация заявок
-    filter_type = request.args.get('filter', 'all')
+    filter_type: str = request.args.get('filter', 'all')
     if filter_type == 'new':
         requests_data = [r for r in requests_data if r.get('status') == 'new']
     elif filter_type == 'in_progress':
@@ -95,10 +98,10 @@ def index():
 def login():
     """Страница входа"""
     if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
+        username: Optional[str] = request.form.get('username')
+        password: Optional[str] = request.form.get('password')
         
-        if username in ADMIN_USERS and check_password_hash(ADMIN_USERS[username], password):
+        if username and password and username in ADMIN_USERS and check_password_hash(ADMIN_USERS[username], password):
             user = User(username)
             login_user(user)
             return redirect(url_for('index'))
@@ -116,10 +119,10 @@ def logout():
 
 @app.route('/request/<int:request_id>')
 @login_required
-def view_request(request_id):
+def view_request(request_id: int):
     """Просмотр конкретной заявки"""
-    requests_data = load_json_file(REQUESTS_FILE)
-    request_item = next((r for r in requests_data if r.get('id') == request_id), None)
+    requests_data: List[Dict[str, Any]] = load_json_file(REQUESTS_FILE)
+    request_item: Optional[Dict[str, Any]] = next((r for r in requests_data if r.get('id') == request_id), None)
     
     if not request_item:
         return "Заявка не найдена", 404
@@ -128,11 +131,14 @@ def view_request(request_id):
 
 @app.route('/update_status/<int:request_id>', methods=['POST'])
 @login_required
-def update_status(request_id):
+def update_status(request_id: int):
     """Обновление статуса заявки"""
-    new_status = request.json.get('status')
+    new_status: Optional[str] = request.json.get('status') if request.json else None
     
-    requests_data = load_json_file(REQUESTS_FILE)
+    if not new_status:
+        return jsonify({'success': False, 'error': 'Статус не указан'})
+    
+    requests_data: List[Dict[str, Any]] = load_json_file(REQUESTS_FILE)
     for req in requests_data:
         if req.get('id') == request_id:
             req['status'] = new_status
@@ -145,17 +151,23 @@ def update_status(request_id):
 
 @app.route('/send_reply/<int:request_id>', methods=['POST'])
 @login_required
-def send_reply(request_id):
+def send_reply(request_id: int):
     """Отправка ответа пользователю через бота"""
-    message = request.json.get('message')
+    message: Optional[str] = request.json.get('message') if request.json else None
     
-    requests_data = load_json_file(REQUESTS_FILE)
-    request_item = next((r for r in requests_data if r.get('id') == request_id), None)
+    if not message:
+        return jsonify({'success': False, 'error': 'Сообщение не указано'})
+    
+    requests_data: List[Dict[str, Any]] = load_json_file(REQUESTS_FILE)
+    request_item: Optional[Dict[str, Any]] = next((r for r in requests_data if r.get('id') == request_id), None)
     
     if not request_item:
         return jsonify({'success': False, 'error': 'Заявка не найдена'})
     
-    user_id = request_item.get('user_id')
+    user_id: Optional[int] = request_item.get('user_id')
+    
+    if not user_id or not bot:
+        return jsonify({'success': False, 'error': 'Не удается отправить сообщение'})
     
     # Отправка сообщения через бота
     try:
@@ -184,12 +196,12 @@ def send_reply(request_id):
 @login_required
 def users_list():
     """Список пользователей"""
-    users_data = load_json_file(USERS_FILE)
+    users_data: Dict[str, Any] = load_json_file(USERS_FILE)
     return render_template('users.html', users=users_data)
 
 @app.route('/export/<export_type>')
 @login_required
-def export_data(export_type):
+def export_data(export_type: str):
     """Экспорт данных"""
     if export_type == 'requests':
         data = load_json_file(REQUESTS_FILE)
