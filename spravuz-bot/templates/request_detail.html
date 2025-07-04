@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Заявка #{{ request.id }}</h1>
+    <a href="{{ url_for('index') }}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Назад
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5 class="card-title">Информация о заявке</h5>
+                <table class="table">
+                    <tr>
+                        <th>Статус:</th>
+                        <td>
+                            <select id="status-select" class="form-select form-select-sm" style="width: auto;">
+                                <option value="new" {% if request.status == 'new' %}selected{% endif %}>Новая</option>
+                                <option value="in_progress" {% if request.status == 'in_progress' %}selected{% endif %}>В работе</option>
+                                <option value="completed" {% if request.status == 'completed' %}selected{% endif %}>Завершена</option>
+                            </select>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Тип:</th>
+                        <td>
+                            {% if request.type == 'correction' %}Исправление данных
+                            {% elif request.type == 'advertising' %}Реклама
+                            {% else %}Сообщение{% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Дата создания:</th>
+                        <td>{{ request.timestamp }}</td>
+                    </tr>
+                    {% if request.updated_at %}
+                    <tr>
+                        <th>Последнее обновление:</th>
+                        <td>{{ request.updated_at }} ({{ request.updated_by }})</td>
+                    </tr>
+                    {% endif %}
+                </table>
+                
+                <h5 class="mt-4">Содержание заявки</h5>
+                {% if request.type == 'correction' %}
+                    <p><strong>Компания и URL:</strong> {{ request.company_info }}</p>
+                    <p><strong>Что нужно исправить:</strong><br>{{ request.correction_details }}</p>
+                {% elif request.type == 'advertising' %}
+                    <p><strong>Запрос:</strong><br>{{ request.ad_request }}</p>
+                    <p><strong>Контакты:</strong> {{ request.contact_info }}</p>
+                {% else %}
+                    <p><strong>Сообщение:</strong><br>{{ request.message }}</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Ответить пользователю</h5>
+                <div class="mb-3">
+                    <textarea id="reply-message" class="form-control" rows="4" placeholder="Введите ответ..."></textarea>
+                </div>
+                <button onclick="sendReply()" class="btn btn-primary">
+                    <i class="bi bi-send"></i> Отправить ответ
+                </button>
+                
+                {% if request.replies %}
+                <h6 class="mt-4">История ответов</h6>
+                {% for reply in request.replies %}
+                <div class="alert alert-secondary">
+                    <small>{{ reply.sent_at }} - {{ reply.sent_by }}</small><br>
+                    {{ reply.message }}
+                </div>
+                {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Информация о пользователе</h5>
+                <p><strong>ФИО:</strong> {{ request.user_data.full_name }}</p>
+                <p><strong>Телефон:</strong> {{ request.user_data.phone }}</p>
+                <p><strong>Компания:</strong> {{ request.user_data.company }}</p>
+                <p><strong>Telegram ID:</strong> {{ request.user_id }}</p>
+                {% if request.user_data.username %}
+                <p><strong>Username:</strong> @{{ request.user_data.username }}</p>
+                {% endif %}
+                <p><strong>Язык:</strong> {{ request.user_data.language }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+$('#status-select').change(function() {
+    $.ajax({
+        url: '/update_status/{{ request.id }}',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({status: $(this).val()}),
+        success: function() {
+            alert('Статус обновлен');
+        }
+    });
+});
+
+function sendReply() {
+    const message = $('#reply-message').val();
+    if (!message) {
+        alert('Введите сообщение');
+        return;
+    }
+    
+    $.ajax({
+        url: '/send_reply/{{ request.id }}',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({message: message}),
+        success: function(response) {
+            if (response.success) {
+                alert('Ответ отправлен');
+                location.reload();
+            } else {
+                alert('Ошибка: ' + response.error);
+            }
+        }
+    });
+}
+</script>
+{% endblock %}

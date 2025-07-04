@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Пользователи</h1>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>ФИО</th>
+                <th>Телефон</th>
+                <th>Компания</th>
+                <th>Username</th>
+                <th>Язык</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user_id, user in users.items() %}
+            <tr>
+                <td>{{ user_id }}</td>
+                <td>{{ user.full_name }}</td>
+                <td>{{ user.phone }}</td>
+                <td>{{ user.company }}</td>
+                <td>{% if user.username %}@{{ user.username }}{% else %}-{% endif %}</td>
+                <td>{{ user.language }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

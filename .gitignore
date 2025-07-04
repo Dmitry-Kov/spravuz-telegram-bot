@@ -1,0 +1,32 @@
+# Игнорируемые файлы
+
+# Виртуальные окружения
+venv/
+venv311/
+__pycache__/
+*.pyc
+*.pyo
+
+# Файлы окружения
+.env
+*.env
+
+# Данные
+*.json
+*.db
+*.sqlite
+
+# Логи
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db

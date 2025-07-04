@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Панель управления</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <a href="{{ url_for('export_data', export_type='requests') }}" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-download"></i> Экспорт заявок
+            </a>
+            <a href="{{ url_for('export_data', export_type='users') }}" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-download"></i> Экспорт пользователей
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-white bg-primary">
+            <div class="card-body">
+                <h5 class="card-title">Всего заявок</h5>
+                <h2>{{ stats.total_requests }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-danger">
+            <div class="card-body">
+                <h5 class="card-title">Новые</h5>
+                <h2>{{ stats.new_requests }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-warning">
+            <div class="card-body">
+                <h5 class="card-title">В работе</h5>
+                <h2>{{ stats.in_progress }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-success">
+            <div class="card-body">
+                <h5 class="card-title">Завершено</h5>
+                <h2>{{ stats.completed }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<h2>Заявки</h2>
+<div class="mb-3">
+    <a href="?filter=all" class="btn btn-sm {% if current_filter == 'all' %}btn-primary{% else %}btn-outline-primary{% endif %}">Все</a>
+    <a href="?filter=new" class="btn btn-sm {% if current_filter == 'new' %}btn-danger{% else %}btn-outline-danger{% endif %}">Новые</a>
+    <a href="?filter=in_progress" class="btn btn-sm {% if current_filter == 'in_progress' %}btn-warning{% else %}btn-outline-warning{% endif %}">В работе</a>
+    <a href="?filter=completed" class="btn btn-sm {% if current_filter == 'completed' %}btn-success{% else %}btn-outline-success{% endif %}">Завершены</a>
+</div>
+
+<div class="row">
+    {% for request in requests %}
+    <div class="col-md-6 mb-3">
+        <div class="card request-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <h5 class="card-title">Заявка #{{ request.id }}</h5>
+                    <span class="badge status-badge status-{{ request.status }}">
+                        {% if request.status == 'new' %}Новая
+                        {% elif request.status == 'in_progress' %}В работе
+                        {% else %}Завершена{% endif %}
+                    </span>
+                </div>
+                <h6 class="card-subtitle mb-2 text-muted">
+                    Тип: {% if request.type == 'correction' %}Исправление данных
+                    {% elif request.type == 'advertising' %}Реклама
+                    {% else %}Сообщение{% endif %}
+                </h6>
+                <p class="card-text">
+                    <strong>От:</strong> {{ request.user_data.full_name }}<br>
+                    <strong>Компания:</strong> {{ request.user_data.company }}<br>
+                    <strong>Дата:</strong> {{ request.timestamp[:10] }}
+                </p>
+                <a href="{{ url_for('view_request', request_id=request.id) }}" class="btn btn-primary btn-sm">
+                    <i class="bi bi-eye"></i> Подробнее
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
