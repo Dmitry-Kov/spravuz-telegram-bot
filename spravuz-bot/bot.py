@@ -161,27 +161,36 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def language_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Обработка выбора языка"""
-    if not update.message or not update.message.text or not context.user_data:
+    logger.info(f"language_choice called with text: {update.message.text if update.message else 'No message'}")
+    
+    if not update.message or not update.message.text:
+        logger.warning("No message or text in language_choice")
         return LANGUAGE
         
     text = update.message.text
+    logger.info(f"Processing language choice: {text}")
     
-    if '🇷🇺' in text:
-        context.user_data['language'] = 'ru'
-    elif '🇺🇿' in text:
-        context.user_data['language'] = 'uz'
-    elif '🇬🇧' in text:
-        context.user_data['language'] = 'en'
+    # Определяем язык
+    if '🇷🇺' in text or 'Русский' in text:
+        selected_lang = 'ru'
+    elif '🇺🇿' in text or 'Uzbek' in text:
+        selected_lang = 'uz'
+    elif '🇬🇧' in text or 'English' in text:
+        selected_lang = 'en'
     else:
-        context.user_data['language'] = 'ru'
+        selected_lang = 'ru'
+    
+    # Сохраняем язык в user_data
+    if context.user_data is not None:
+        context.user_data['language'] = selected_lang
+    logger.info(f"Selected language: {selected_lang}")
     
     # Запрос контакта
-    lang = context.user_data['language']
-    keyboard = [[KeyboardButton(TEXTS[lang]['share_button'], request_contact=True)]]
+    keyboard = [[KeyboardButton(TEXTS[selected_lang]['share_button'], request_contact=True)]]
     reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
     
     await update.message.reply_text(
-        TEXTS[lang]['share_contact'],
+        TEXTS[selected_lang]['share_contact'],
         reply_markup=reply_markup
     )
     
@@ -439,7 +448,11 @@ def main() -> None:
     
     # Обработчик диалога
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("start", start)],
+        entry_points=[
+            CommandHandler("start", start),
+            CommandHandler("menu", start),
+            CommandHandler("help", start)
+        ],
         states={
             LANGUAGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, language_choice)],
             PHONE_NUMBER: [MessageHandler(filters.CONTACT | filters.TEXT, phone_number_received)],
