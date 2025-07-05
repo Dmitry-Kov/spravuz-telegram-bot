@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  telegram-bot:
+    build: .
+    container_name: spravuz-bot
+    restart: unless-stopped
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - MANAGER_USERNAME=${MANAGER_USERNAME:-manager}
+      - MANAGER_PASSWORD=${MANAGER_PASSWORD:-manager123}
+    volumes:
+      - ./data:/app/data
+      - ./users_data.json:/app/users_data.json
+      - ./requests_data.json:/app/requests_data.json
+    command: python bot.py
+    depends_on:
+      - admin-panel
+    networks:
+      - spravuz-network
+
+  admin-panel:
+    build: .
+    container_name: spravuz-admin
+    restart: unless-stopped
+    ports:
+      - "5050:5050"
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - MANAGER_USERNAME=${MANAGER_USERNAME:-manager}
+      - MANAGER_PASSWORD=${MANAGER_PASSWORD:-manager123}
+    volumes:
+      - ./data:/app/data
+      - ./users_data.json:/app/users_data.json
+      - ./requests_data.json:/app/requests_data.json
+      - ./templates:/app/templates
+    command: python admin_panel.py
+    networks:
+      - spravuz-network
+
+networks:
+  spravuz-network:
+    driver: bridge
+
+volumes:
+  data: 
