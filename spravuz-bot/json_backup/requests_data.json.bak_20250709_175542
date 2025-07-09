@@ -1,0 +1,41 @@
+[
+  {
+    "type": "advertising",
+    "user_id": 169716572,
+    "user_data": {
+      "phone": "+79233333161",
+      "full_name": "Ковалев Дмитрий Игоревич",
+      "company": "Дмитрий и Компания",
+      "username": "doppelganger7",
+      "language": "ru"
+    },
+    "ad_request": "Хочу рекламу на банере",
+    "contact_info": "793333333",
+    "id": 1,
+    "timestamp": "2025-07-03T19:21:48.533922",
+    "status": "new"
+  },
+  {
+    "type": "advertising",
+    "user_id": 169716572,
+    "user_data": {
+      "phone": "+79233333161",
+      "full_name": "Ракета Комета Фкеждор",
+      "company": "Компания шмампания",
+      "username": "doppelganger7",
+      "language": "ru"
+    },
+    "ad_request": "Хочу рекдаму",
+    "contact_info": "Валера 777",
+    "id": 2,
+    "timestamp": "2025-07-04T19:55:33.862659",
+    "status": "new",
+    "replies": [
+      {
+        "message": "Как ты брат?",
+        "sent_at": "2025-07-05T14:17:21.711657",
+        "sent_by": "admin"
+      }
+    ]
+  }
+]

@@ -6,6 +6,7 @@ import os
 from datetime import datetime
 import json
 from typing import Dict, Any, Optional, List
+from database import db
 
 # Загружаем переменные окружения из .env файла
 load_dotenv()
@@ -98,47 +99,8 @@ TEXTS: Dict[str, Dict[str, str]] = {
     }
 }
 
-class UserData:
-    """Класс для хранения данных пользователя"""
-    def __init__(self) -> None:
-        self.users_file: str = 'users_data.json'
-        self.requests_file: str = 'requests_data.json'
-        self.users: Dict[str, Any] = {}
-        self.requests: List[Dict[str, Any]] = []
-        self.load_data()
-    
-    def load_data(self) -> None:
-        """Загрузка данных из файлов"""
-        try:
-            with open(self.users_file, 'r', encoding='utf-8') as f:
-                self.users = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            self.users = {}
-        
-        try:
-            with open(self.requests_file, 'r', encoding='utf-8') as f:
-                self.requests = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            self.requests = []
-    
-    def save_user(self, user_id: str, data: Dict[str, Any]) -> None:
-        """Сохранение данных пользователя"""
-        self.users[user_id] = data
-        with open(self.users_file, 'w', encoding='utf-8') as f:
-            json.dump(self.users, f, ensure_ascii=False, indent=2)
-    
-    def save_request(self, request_data: Dict[str, Any]) -> int:
-        """Сохранение заявки"""
-        request_data['id'] = len(self.requests) + 1
-        request_data['timestamp'] = datetime.now().isoformat()
-        request_data['status'] = 'new'
-        self.requests.append(request_data)
-        with open(self.requests_file, 'w', encoding='utf-8') as f:
-            json.dump(self.requests, f, ensure_ascii=False, indent=2)
-        return request_data['id']
-
-# Инициализация хранилища данных
-user_data_storage = UserData()
+# Инициализация хранилища данных теперь использует database.py
+# user_data_storage = UserData() - заменено на db из database.py
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Начало диалога - выбор языка"""
@@ -236,8 +198,8 @@ async def company_name_received(update: Update, context: ContextTypes.DEFAULT_TY
     context.user_data['company'] = update.message.text
     
     # Сохраняем данные пользователя
-    user_data_storage.save_user(
-        str(update.message.from_user.id),
+    db.save_user(
+        update.message.from_user.id,
         {
             'phone': context.user_data.get('phone'),
             'full_name': context.user_data.get('full_name'),
@@ -350,10 +312,9 @@ async def company_correction_details(update: Update, context: ContextTypes.DEFAU
         return await show_main_menu(update, context)
     
     # Сохраняем заявку
-    request_id = user_data_storage.save_request({
+    request_id = db.save_request({
         'type': 'correction',
         'user_id': update.message.from_user.id,
-        'user_data': user_data_storage.users.get(str(update.message.from_user.id), {}),
         'company_info': context.user_data.get('correction_company'),
         'correction_details': update.message.text
     })
@@ -388,10 +349,9 @@ async def advertising_contact(update: Update, context: ContextTypes.DEFAULT_TYPE
         return await show_main_menu(update, context)
     
     # Сохраняем заявку
-    request_id = user_data_storage.save_request({
+    request_id = db.save_request({
         'type': 'advertising',
         'user_id': update.message.from_user.id,
-        'user_data': user_data_storage.users.get(str(update.message.from_user.id), {}),
         'ad_request': context.user_data.get('ad_request'),
         'contact_info': update.message.text
     })
@@ -412,10 +372,9 @@ async def free_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         return await show_main_menu(update, context)
     
     # Сохраняем заявку
-    request_id = user_data_storage.save_request({
+    request_id = db.save_request({
         'type': 'message',
         'user_id': update.message.from_user.id,
-        'user_data': user_data_storage.users.get(str(update.message.from_user.id), {}),
         'message': update.message.text
     })
     

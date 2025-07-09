@@ -13,8 +13,7 @@ services:
       - MANAGER_PASSWORD=${MANAGER_PASSWORD:-manager123}
     volumes:
       - ./data:/app/data
-      - ./users_data.json:/app/users_data.json
-      - ./requests_data.json:/app/requests_data.json
+      - ./spravuz_bot.db:/app/spravuz_bot.db
     command: python bot.py
     depends_on:
       - admin-panel
@@ -35,8 +34,7 @@ services:
       - MANAGER_PASSWORD=${MANAGER_PASSWORD:-manager123}
     volumes:
       - ./data:/app/data
-      - ./users_data.json:/app/users_data.json
-      - ./requests_data.json:/app/requests_data.json
+      - ./spravuz_bot.db:/app/spravuz_bot.db
       - ./templates:/app/templates
     command: python admin_panel.py
     networks:

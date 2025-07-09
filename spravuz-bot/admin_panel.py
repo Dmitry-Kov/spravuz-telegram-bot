@@ -8,6 +8,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import asyncio
 from telegram import Bot
 from typing import Dict, List, Any, Optional, Union, Tuple
+from database import db
 
 # Загружаем переменные окружения из .env файла
 load_dotenv()
@@ -44,50 +45,27 @@ def load_user(user_id: str) -> Optional[User]:
         return User(user_id)
     return None
 
-# Пути к файлам данных
-USERS_FILE: str = 'users_data.json'
-REQUESTS_FILE: str = 'requests_data.json'
+# Пути к файлам данных теперь не нужны - используем БД
+# USERS_FILE: str = 'users_data.json'
+# REQUESTS_FILE: str = 'requests_data.json'
 
-def load_json_file(filename: str) -> Any:
-    """Загрузка данных из JSON файла"""
-    try:
-        with open(filename, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {} if filename == USERS_FILE else []
-
-def save_json_file(filename: str, data: Any) -> None:
-    """Сохранение данных в JSON файл"""
-    with open(filename, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+# Функции для работы с JSON файлами заменены на БД
+# def load_json_file(filename: str) -> Any:
+# def save_json_file(filename: str, data: Any) -> None:
 
 @app.route('/')
 @login_required
 def index() -> str:
     """Главная страница - панель управления"""
-    requests_data: List[Dict[str, Any]] = load_json_file(REQUESTS_FILE)
-    users_data: Dict[str, Any] = load_json_file(USERS_FILE)
-    
-    # Статистика
-    stats: Dict[str, int] = {
-        'total_requests': len(requests_data),
-        'new_requests': len([r for r in requests_data if r.get('status') == 'new']),
-        'in_progress': len([r for r in requests_data if r.get('status') == 'in_progress']),
-        'completed': len([r for r in requests_data if r.get('status') == 'completed']),
-        'total_users': len(users_data)
-    }
+    # Получаем статистику из БД
+    stats: Dict[str, int] = db.get_stats()
     
     # Фильтрация заявок
     filter_type: str = request.args.get('filter', 'all')
-    if filter_type == 'new':
-        requests_data = [r for r in requests_data if r.get('status') == 'new']
-    elif filter_type == 'in_progress':
-        requests_data = [r for r in requests_data if r.get('status') == 'in_progress']
-    elif filter_type == 'completed':
-        requests_data = [r for r in requests_data if r.get('status') == 'completed']
-    
-    # Сортировка по дате (новые первые)
-    requests_data.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+    if filter_type == 'all':
+        requests_data = db.get_requests()
+    else:
+        requests_data = db.get_requests(filter_type)
     
     return render_template('dashboard.html', 
                          requests=requests_data, 
@@ -121,8 +99,7 @@ def logout():
 @login_required
 def view_request(request_id: int):
     """Просмотр конкретной заявки"""
-    requests_data: List[Dict[str, Any]] = load_json_file(REQUESTS_FILE)
-    request_item: Optional[Dict[str, Any]] = next((r for r in requests_data if r.get('id') == request_id), None)
+    request_item: Optional[Dict[str, Any]] = db.get_request_by_id(request_id)
     
     if not request_item:
         return "Заявка не найдена", 404
@@ -138,16 +115,12 @@ def update_status(request_id: int):
     if not new_status:
         return jsonify({'success': False, 'error': 'Статус не указан'})
     
-    requests_data: List[Dict[str, Any]] = load_json_file(REQUESTS_FILE)
-    for req in requests_data:
-        if req.get('id') == request_id:
-            req['status'] = new_status
-            req['updated_at'] = datetime.now().isoformat()
-            req['updated_by'] = current_user.id
-            break
+    success = db.update_request_status(request_id, new_status, current_user.id)
     
-    save_json_file(REQUESTS_FILE, requests_data)
-    return jsonify({'success': True})
+    if success:
+        return jsonify({'success': True})
+    else:
+        return jsonify({'success': False, 'error': 'Заявка не найдена'})
 
 @app.route('/send_reply/<int:request_id>', methods=['POST'])
 @login_required
@@ -158,8 +131,7 @@ def send_reply(request_id: int):
     if not message:
         return jsonify({'success': False, 'error': 'Сообщение не указано'})
     
-    requests_data: List[Dict[str, Any]] = load_json_file(REQUESTS_FILE)
-    request_item: Optional[Dict[str, Any]] = next((r for r in requests_data if r.get('id') == request_id), None)
+    request_item: Optional[Dict[str, Any]] = db.get_request_by_id(request_id)
     
     if not request_item:
         return jsonify({'success': False, 'error': 'Заявка не найдена'})
@@ -176,17 +148,8 @@ def send_reply(request_id: int):
             text=f"Ответ на вашу заявку #{request_id}:\n\n{message}"
         ))
         
-        # Сохранение истории ответов
-        if 'replies' not in request_item:
-            request_item['replies'] = []
-        
-        request_item['replies'].append({
-            'message': message,
-            'sent_at': datetime.now().isoformat(),
-            'sent_by': current_user.id
-        })
-        
-        save_json_file(REQUESTS_FILE, requests_data)
+        # Сохранение истории ответов в БД
+        db.add_reply(request_id, message, current_user.id)
         
         return jsonify({'success': True})
     except Exception as e:
@@ -196,7 +159,7 @@ def send_reply(request_id: int):
 @login_required
 def users_list():
     """Список пользователей"""
-    users_data: Dict[str, Any] = load_json_file(USERS_FILE)
+    users_data: Dict[str, Any] = db.get_all_users()
     return render_template('users.html', users=users_data)
 
 @app.route('/export/<export_type>')
@@ -204,9 +167,9 @@ def users_list():
 def export_data(export_type: str):
     """Экспорт данных"""
     if export_type == 'requests':
-        data = load_json_file(REQUESTS_FILE)
+        data = db.get_requests()
     elif export_type == 'users':
-        data = load_json_file(USERS_FILE)
+        data = db.get_all_users()
     else:
         return "Неверный тип экспорта", 400
     
