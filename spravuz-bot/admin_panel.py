@@ -7,8 +7,10 @@ from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 import asyncio
 from telegram import Bot
+from telegram.error import TelegramError
 from typing import Dict, List, Any, Optional, Union, Tuple
 from database import db
+from bot import create_bot_application
 
 # Загружаем переменные окружения из .env файла
 load_dotenv()
@@ -556,12 +558,14 @@ function sendReply() {
 {% endblock %}
 """)
 
-if __name__ == '__main__':
-    # Создаем шаблоны при запуске
+def run_admin_panel() -> None:
+    """Локальный запуск админ-панели (для разработки/ручного запуска)."""
     create_templates()
-    
-    # Запуск приложения
-    print("Админ-панель запущена на http://localhost:5000")
+    print("Админ-панель запущена на http://localhost:5050")
     print("Логин: admin, Пароль: admin123")
     print("Логин: manager, Пароль: manager123")
     app.run(debug=False, host='0.0.0.0', port=5050)
+
+
+if __name__ == '__main__':
+    run_admin_panel()

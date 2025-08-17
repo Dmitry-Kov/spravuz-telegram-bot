@@ -1,3 +1,34 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.so
+
+# Environments
+.env
+*.env
+.venv/
+venv/
+venv311/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+
+# Data and runtime files
+*.sqlite3
+*.db
+spravuz-bot/data/
+spravuz-bot/json_backup/
+spravuz-bot/users_data.json
+spravuz-bot/requests_data.json
+spravuz-bot/bot_token.txt
+
+# Builds/archives
+spravuz-bot-deploy.tar.gz
+
 # Игнорируемые файлы
 
 # Виртуальные окружения

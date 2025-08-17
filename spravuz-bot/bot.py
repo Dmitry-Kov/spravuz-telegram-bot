@@ -394,18 +394,14 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     )
     return ConversationHandler.END
 
-def main() -> None:
-    """Запуск бота"""
-    # Токен бота из переменной окружения
-    TOKEN: Optional[str] = os.getenv('BOT_TOKEN')
-    if not TOKEN:
-        logger.error("BOT_TOKEN не найден в переменных окружения")
-        return
-    
-    # Создание приложения
-    application = Application.builder().token(TOKEN).build()
-    
-    # Обработчик диалога
+def create_bot_application(token: str) -> Application:
+    """Создает и настраивает Application для бота (без запуска).
+
+    Используется как для обычного запуска (polling), так и в режиме вебхука
+    внутри веб-приложения (например, cPanel/Passenger).
+    """
+    application = Application.builder().token(token).build()
+
     conv_handler = ConversationHandler(
         entry_points=[
             CommandHandler("start", start),
@@ -426,10 +422,21 @@ def main() -> None:
         },
         fallbacks=[CommandHandler("cancel", cancel)],
     )
-    
+
     application.add_handler(conv_handler)
-    
-    # Запуск бота
+    return application
+
+
+def main() -> None:
+    """Запуск бота"""
+    # Токен бота из переменной окружения
+    TOKEN: Optional[str] = os.getenv('BOT_TOKEN')
+    if not TOKEN:
+        logger.error("BOT_TOKEN не найден в переменных окружения")
+        return
+
+    # Создание приложения и запуск в режиме polling
+    application = create_bot_application(TOKEN)
     application.run_polling()
 
 if __name__ == '__main__':
